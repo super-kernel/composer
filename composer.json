@@ -1,0 +1,13 @@
+{
+    "name": "super-kernel/composer",
+    "description": "The composer component for super-kernel.",
+    "type": "library",
+    "license": "MIT",
+    "autoload": {
+        "psr-4": {
+            "SuperKernel\\Composer\\": "src/"
+        }
+    },
+    "minimum-stability": "stable",
+    "require": {}
+}
