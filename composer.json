@@ -9,5 +9,10 @@
         }
     },
     "minimum-stability": "stable",
-    "require": {}
+    "require": {
+        "php": ">=8.4"
+    },
+    "require-dev": {
+        "nikic/php-parser": "^5.7"
+    }
 }
