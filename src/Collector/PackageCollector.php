@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace SuperKernel\Composer;
+namespace SuperKernel\Composer\Collector;
 
 use SuperKernel\Composer\Constant\PackageType;
 use SuperKernel\Composer\Contract\PackageCollectorInterface;
