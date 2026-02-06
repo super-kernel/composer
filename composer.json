@@ -8,6 +8,11 @@
             "SuperKernel\\Composer\\": "src/"
         }
     },
+    "autoload-dev": {
+        "psr-4": {
+            "SuperKernelTest\\Composer\\": "tests/src/"
+        }
+    },
     "minimum-stability": "stable",
     "require": {
         "php": "^8.4",

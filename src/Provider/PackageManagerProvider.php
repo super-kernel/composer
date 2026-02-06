@@ -14,7 +14,7 @@ use SuperKernel\Composer\PathLocator;
 ]
 final class PackageManagerProvider
 {
-	public function __invoke(PathLocator $pathLocator)
+	public function __invoke(PathLocator $pathLocator): array
 	{
 	}
 }

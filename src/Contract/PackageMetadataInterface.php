@@ -5,8 +5,7 @@ namespace SuperKernel\Composer\Contract;
 
 interface PackageMetadataInterface
 {
-	/**
-	 * @return array<PackageInterface>
-	 */
-	public function getPackages(): array;
+	public function getName(): string;
+
+	public function getType(): string;
 }

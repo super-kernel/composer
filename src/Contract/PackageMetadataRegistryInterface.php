@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Contract;
 
-interface PackageInterface
+interface PackageMetadataRegistryInterface
 {
-	public function getName(): string;
 }
