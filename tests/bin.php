@@ -1,11 +1,13 @@
 <?php
 declare(strict_types=1);
 
-use SuperKernel\Composer\Factory\PackageMetadataRegistryFactory;
-use SuperKernel\Composer\Factory\PathLocatorFactory;
+use SuperKernel\Composer\Factory\PackageMetadataFactory;
+use SuperKernel\Composer\Factory\ComposerConfigFactory;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-$pathLocator = new PathLocatorFactory()(dirname(__DIR__));
+$pathLocator = new ComposerConfigFactory()(dirname(__DIR__));
 
-$packageMetadataRegistry = new PackageMetadataRegistryFactory()($pathLocator);
+$packageMetadataRegistry = new PackageMetadataFactory()($pathLocator);
+
+var_dump($packageMetadataRegistry);
