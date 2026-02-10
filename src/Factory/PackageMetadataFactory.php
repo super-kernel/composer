@@ -16,6 +16,10 @@ final class PackageMetadataFactory
 		if (!isset(self::$packageMetadata)) {
 			$composerConfig ??= new ComposerConfigFactory()();
 
+			var_dump(
+				new PackageSchemaMetadataFactory()($composerConfig),
+			);
+
 			self::$packageMetadata = new PackageMetadata(
 				new PackageSchemaMetadataFactory()($composerConfig),
 			);

@@ -38,11 +38,4 @@ interface PackageSchemaMetadataInterface
 	 * @return array<string, PackageSchemaInterface> All locked packages indexed by package name.
 	 */
 	public function getAllPackages(bool $requireDev = true): array;
-
-	/**
-	 * Retrieve the raw `composer.lock` data.
-	 *
-	 * @return array<string, mixed> The decoded lock file data.
-	 */
-	public function getRawData(): array;
 }

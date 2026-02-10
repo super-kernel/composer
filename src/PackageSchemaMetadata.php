@@ -3,46 +3,32 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer;
 
+use RuntimeException;
 use SuperKernel\Composer\Contract\PackageSchemaInterface;
 use SuperKernel\Composer\Contract\PackageSchemaMetadataInterface;
-use function array_merge;
+use SuperKernel\Composer\Schema\DevPackageSchema;
+use SuperKernel\Composer\Schema\RootPackageSchema;
 
 final readonly class PackageSchemaMetadata implements PackageSchemaMetadataInterface
 {
-	private PackageSchemaInterface $rootPackage;
-
 	/**
 	 * @var array<string, PackageSchemaInterface> $packages
 	 */
 	private array $packages;
 
-	/**
-	 * @var array<string, PackageSchemaInterface> $devPackages
-	 */
-	private array $devPackages;
-
-	public function __construct(private array $rowData, array $rootPackage)
+	public function __construct(PackageSchemaInterface ...$packages)
 	{
-		$this->rootPackage = new PackageSchema($rootPackage);
-
-		$this->packages    = $this->buildPackageMap($this->rowData['packages']);
-		$this->devPackages = $this->buildPackageMap($this->rowData['packages-dev']);
-	}
-
-	private function buildPackageMap(array $rows): array
-	{
-		$map = [];
-		foreach ($rows as $packageData) {
-			$package = new PackageSchema($packageData);
-
-			$map[$package->getName()] = $package;
-		}
-		return $map;
+		$this->packages = $packages;
 	}
 
 	public function getRootPackage(): PackageSchemaInterface
 	{
-		return $this->rootPackage;
+		foreach ($this->packages as $package) {
+			if ($package instanceof RootPackageSchema) {
+				return $package;
+			}
+		}
+		throw new RuntimeException('The Root package not fount.');
 	}
 
 	public function getPackage(string $packageName): ?PackageSchemaInterface
@@ -59,13 +45,15 @@ final readonly class PackageSchemaMetadata implements PackageSchemaMetadataInter
 	public function getAllPackages(bool $requireDev = true): array
 	{
 		if ($requireDev) {
-			return array_merge($this->packages, $this->devPackages);
+			return $this->packages;
 		}
-		return $this->packages;
-	}
 
-	public function getRawData(): array
-	{
-		return $this->rowData;
+		$packages = [];
+		foreach ($this->packages as $package) {
+			if (!($package instanceof DevPackageSchema)) {
+				$packages[] = $package;
+			}
+		}
+		return $packages;
 	}
 }

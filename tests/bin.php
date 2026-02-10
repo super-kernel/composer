@@ -9,5 +9,3 @@ require_once __DIR__ . '/../vendor/autoload.php';
 $pathLocator = new ComposerConfigFactory()(dirname(__DIR__));
 
 $packageMetadataRegistry = new PackageMetadataFactory()($pathLocator);
-
-var_dump($packageMetadataRegistry);

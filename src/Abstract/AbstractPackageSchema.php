@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace SuperKernel\Composer;
+namespace SuperKernel\Composer\Abstract;
 
 use RuntimeException;
 use SuperKernel\Composer\Contract\PackageSchemaInterface;
@@ -9,9 +9,9 @@ use function preg_replace;
 use function property_exists;
 use function strtolower;
 
-final readonly class PackageSchema implements PackageSchemaInterface
+abstract readonly class AbstractPackageSchema implements PackageSchemaInterface
 {
-	public function __construct(private array $rows)
+	public function __construct(protected array $rows)
 	{
 	}
 

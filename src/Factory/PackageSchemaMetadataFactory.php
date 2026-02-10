@@ -9,6 +9,9 @@ use SuperKernel\Annotation\Provider;
 use SuperKernel\Composer\ComposerConfig;
 use SuperKernel\Composer\Contract\PackageSchemaMetadataInterface;
 use SuperKernel\Composer\PackageSchemaMetadata;
+use SuperKernel\Composer\Schema\DevPackageSchema;
+use SuperKernel\Composer\Schema\PackageSchema;
+use SuperKernel\Composer\Schema\RootPackageSchema;
 
 #[
 	Provider(PackageSchemaMetadataInterface::class),
@@ -24,7 +27,17 @@ final class PackageSchemaMetadataFactory
 			$rootPackageData = $this->loadJsonFileToArray($composerConfig->getPath() . '/composer.json');
 			$lockPackageData = $this->loadJsonFileToArray($composerConfig->getPath() . '/composer.lock');
 
-			$this->lockPackageMetadata = new PackageSchemaMetadata($lockPackageData, $rootPackageData);
+			$packages = [];
+
+			$packages[] = new RootPackageSchema($rootPackageData);
+			foreach ($lockPackageData['packages-dev'] ?? [] as $packageData) {
+				$packages[] = new DevPackageSchema($packageData);
+			}
+			foreach ($lockPackageData['packages'] ?? [] as $packageData) {
+				$packages[] = new PackageSchema($packageData);
+			}
+
+			$this->lockPackageMetadata = new PackageSchemaMetadata(...$packages);
 		}
 		return $this->lockPackageMetadata;
 	}
