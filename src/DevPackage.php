@@ -3,7 +3,7 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer;
 
-final readonly class Package
+final readonly class DevPackage
 {
 	public function __construct(private array $data)
 	{

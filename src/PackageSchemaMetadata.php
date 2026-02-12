@@ -3,11 +3,10 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer;
 
-use RuntimeException;
+use SuperKernel\Composer\Contract\ComposerConfigInterface;
 use SuperKernel\Composer\Contract\PackageSchemaInterface;
 use SuperKernel\Composer\Contract\PackageSchemaMetadataInterface;
-use SuperKernel\Composer\Schema\DevPackageSchema;
-use SuperKernel\Composer\Schema\RootPackageSchema;
+use function array_merge;
 
 final readonly class PackageSchemaMetadata implements PackageSchemaMetadataInterface
 {
@@ -16,19 +15,14 @@ final readonly class PackageSchemaMetadata implements PackageSchemaMetadataInter
 	 */
 	private array $packages;
 
-	public function __construct(PackageSchemaInterface ...$packages)
+	public function __construct(private ComposerConfigInterface $composerConfig, PackageSchemaInterface ...$packages)
 	{
 		$this->packages = $packages;
 	}
 
 	public function getRootPackage(): PackageSchemaInterface
 	{
-		foreach ($this->packages as $package) {
-			if ($package instanceof RootPackageSchema) {
-				return $package;
-			}
-		}
-		throw new RuntimeException('The Root package not fount.');
+		return $this->composerConfig->getRootPackageSchema();
 	}
 
 	public function getPackage(string $packageName): ?PackageSchemaInterface
@@ -44,16 +38,21 @@ final readonly class PackageSchemaMetadata implements PackageSchemaMetadataInter
 
 	public function getAllPackages(bool $requireDev = true): array
 	{
+		$packages = [
+			$this->composerConfig->getRootPackageSchema(),
+		];
+
 		if ($requireDev) {
-			return $this->packages;
+			return array_merge($this->packages, $packages);
 		}
 
-		$packages = [];
 		foreach ($this->packages as $package) {
-			if (!($package instanceof DevPackageSchema)) {
-				$packages[] = $package;
+			if ($package->isDevRequirement()) {
+				continue;
 			}
+			$packages[] = $package;
 		}
+
 		return $packages;
 	}
 }
