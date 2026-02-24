@@ -3,7 +3,9 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer;
 
-final readonly class Package
+use SuperKernel\Composer\Contract\PackageInterface;
+
+final readonly class Package implements PackageInterface
 {
 	public function __construct(private array $data)
 	{

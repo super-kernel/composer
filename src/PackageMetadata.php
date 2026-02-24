@@ -3,24 +3,32 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer;
 
+use SuperKernel\Composer\Contract\PackageInterface;
 use SuperKernel\Composer\Contract\PackageMetadataInterface;
-use SuperKernel\Composer\Contract\PackageSchemaMetadataInterface;
 
 final readonly class PackageMetadata implements PackageMetadataInterface
 {
 	private array $packages;
 
-	public function __construct(PackageSchemaMetadataInterface $packageSchemaMetadata)
+	public function __construct(PackageInterface ...$packages)
 	{
+		foreach ($packages as $package) {
+			$this->packages[$package->getName()] = $packages;
+		}
 	}
 
-	public function getName(): string
+	public function hasPackage(string $packageName): bool
 	{
-		// TODO: Implement getName() method.
+		return isset($this->packages[$packageName]);
 	}
 
-	public function getType(): string
+	public function getPackage(string $packageName): ?PackageMetadataInterface
 	{
-		// TODO: Implement getType() method.
+		return $this->packages[$packageName] ?? null;
+	}
+
+	public function getPackages(): array
+	{
+		return $this->packages;
 	}
 }

@@ -6,6 +6,8 @@ use SuperKernel\Composer\Factory\ComposerConfigFactory;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-$pathLocator = new ComposerConfigFactory()(dirname(__DIR__));
+//$pathLocator = new ComposerConfigFactory()(dirname(__DIR__));
 
-$packageMetadataRegistry = new PackageMetadataFactory()($pathLocator);
+$packageMetadataRegistry = new PackageMetadataFactory()(
+//	$pathLocator
+);

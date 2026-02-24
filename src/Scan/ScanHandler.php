@@ -6,6 +6,7 @@ namespace SuperKernel\Composer\Scan;
 use SuperKernel\Composer\Contract\ScanDriverInterface;
 use SuperKernel\Composer\Contract\PackageMetadataInterface;
 use SuperKernel\Composer\Contract\PackageSchemaMetadataInterface;
+use SuperKernel\Composer\PackageMetadata;
 
 final readonly class ScanHandler
 {
@@ -20,7 +21,7 @@ final readonly class ScanHandler
 	{
 		$scanned = $this->scanDriver->scan();
 		if ($scanned->isScanned()) {
-
+			return new PackageMetadata($this->packageSchemaMetadata);
 		}
 	}
 }
