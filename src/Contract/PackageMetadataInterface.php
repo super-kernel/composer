@@ -5,4 +5,7 @@ namespace SuperKernel\Composer\Contract;
 
 interface PackageMetadataInterface
 {
+	public function getName(): string;
+
+	public function getReference(): ?string;
 }

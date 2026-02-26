@@ -3,6 +3,9 @@
     "description": "The composer component for super-kernel.",
     "type": "library",
     "license": "MIT",
+    "bin": [
+        "vendor/bin/skernel"
+    ],
     "autoload": {
         "psr-4": {
             "SuperKernel\\Composer\\": "src/"
@@ -16,6 +19,10 @@
     "minimum-stability": "stable",
     "require": {
         "php": "^8.4",
+        "ext-pcntl": "*",
         "super-kernel/annotation": "^0.0.1"
+    },
+    "require-dev": {
+        "super-kernel/path-resolver": "dev-main"
     }
 }

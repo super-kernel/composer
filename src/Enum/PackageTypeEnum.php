@@ -12,6 +12,4 @@ enum PackageTypeEnum: string
 	case METAPACKAGE = 'metapackage';
 
 	case PROJECT = 'project';
-
-	case CUSTOM = 'custom';
 }

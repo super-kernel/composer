@@ -5,5 +5,5 @@ namespace SuperKernel\Composer\Contract;
 
 interface ScannerInterface
 {
-
+	public function scan(): PackageMetadataRegistryInterface;
 }
