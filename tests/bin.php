@@ -5,6 +5,8 @@ use SuperKernel\Composer\Factory\PackageMetadataRegistryFactory;
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
+$packageMetadataRegistry = new PackageMetadataRegistryFactory()();
+
 var_dump(
-	new PackageMetadataRegistryFactory()()->getPackages(),
+	$packageMetadataRegistry->getPackage('super-kernel/path-resolver'),
 );

@@ -9,8 +9,7 @@ final readonly class PackageMetadata implements PackageMetadataInterface
 {
 	public function __construct(
 		private string  $name,
-		private array   $attributes,
-		private array   $classMap,
+		private array   $classmap,
 		private ?string $reference = null,
 	)
 	{

@@ -7,7 +7,6 @@ use AppendIterator;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
-use ReflectionClass;
 use SplFileInfo;
 use SuperKernel\Annotation\Factory;
 use SuperKernel\Annotation\Provider;
@@ -16,12 +15,10 @@ use SuperKernel\Composer\Contract\PackageInterface;
 use SuperKernel\Composer\Contract\PackageMetadataInterface;
 use SuperKernel\Composer\PackageMetadata;
 use SuperKernel\PathResolver\Interface\PathResolverInterface;
-use Throwable;
 use function array_filter;
 use function array_merge_recursive;
 use function array_unique;
 use function array_walk_recursive;
-use function class_exists;
 use function file_get_contents;
 use function is_array;
 use function is_dir;
@@ -46,17 +43,13 @@ final readonly class PackageMetadataFactory
 		$this->vendorDir = $this->pathResolver->resolve('vendor');
 	}
 
-	/**
-	 * 为 Package 生成元数据
-	 */
 	public function create(PackageInterface $package): PackageMetadataInterface
 	{
 		$packageName = $package->getName();
 		$packagePath = $this->getPackagePath($package);
 		$targetDirs  = $this->getScanDirectories($package);
 
-		$classMap      = [];
-		$attributesMap = [];
+		$classmap = [];
 
 		$combinedIterator = new AppendIterator();
 		foreach ($targetDirs as $relDir) {
@@ -71,11 +64,11 @@ final readonly class PackageMetadataFactory
 		/** @var SplFileInfo $file */
 		foreach ($combinedIterator as $file) {
 			if ('php' === $file->getExtension()) {
-				$this->processFile($file, $classMap, $attributesMap);
+				$this->processFile($file, $classmap);
 			}
 		}
 
-		return new PackageMetadata($packageName, $attributesMap, $classMap);
+		return new PackageMetadata($packageName, $classmap);
 	}
 
 	private function getPackagePath(PackageInterface $package): string
@@ -116,41 +109,15 @@ final readonly class PackageMetadataFactory
 		return trim($path, "./\\ ");
 	}
 
-	private function processFile(SplFileInfo $file, array &$classMap, array &$attributesMap): void
+	private function processFile(SplFileInfo $file, array &$classmap): void
 	{
 		$realPath = $file->getRealPath();
 		$content  = file_get_contents($realPath);
 
-		$fqcn = $this->parser->getFullyQualifiedClassName($content);
+		$classname = $this->parser->getFullyQualifiedClassName($content);
 
-		if ($fqcn) {
-			$classMap[$fqcn] = str_replace($this->pathResolver . DIRECTORY_SEPARATOR, '', $realPath);
-
-//			$attributesMap[$fqcn] = $this->collectAttributes($fqcn);
+		if ($classname) {
+			$classmap[$classname] = str_replace($this->pathResolver . DIRECTORY_SEPARATOR, '', $realPath);
 		}
 	}
-
-//	private function collectAttributes(string $fqcn): array
-//	{
-//		if (!class_exists($fqcn)) {
-//			return [];
-//		}
-//
-//		try {
-//			$reflection = new ReflectionClass($fqcn);
-//			$instances  = [];
-//			foreach ($reflection->getAttributes() as $attr) {
-//				try {
-//					$instances[] = $attr->newInstance();
-//				}
-//				catch (Throwable) {
-//					continue;
-//				}
-//			}
-//			return $instances;
-//		}
-//		catch (Throwable) {
-//			return [];
-//		}
-//	}
 }

@@ -18,15 +18,23 @@ use function glob;
 use function is_dir;
 use function str_replace;
 use function unserialize;
+use const DIRECTORY_SEPARATOR;
 
 final readonly class Scanner implements ScannerInterface
 {
+	private string $cacheDir;
+
 	public function __construct(
 		private DriverInterface          $driver,
 		private PathResolverInterface    $pathResolver,
 		private PackageRegistryInterface $packageRegistry,
 	)
 	{
+		$cacheDir = $this->pathResolver->resolve('vendor/.skernel/');
+		if (!is_dir($cacheDir) && !mkdir($cacheDir, 0755, true) && !is_dir($cacheDir)) {
+			throw new RuntimeException("Failed to create cache directory: $cacheDir");
+		}
+		$this->cacheDir = $cacheDir;
 	}
 
 	public function scan(): PackageMetadataRegistryInterface
@@ -34,7 +42,7 @@ final readonly class Scanner implements ScannerInterface
 		$this->driver->execute(function () {
 			$packages = [];
 			foreach ($this->packageRegistry->getPackages() as $package) {
-				$packages[] = $this->makePackageMetadata($package);
+				$this->makePackageMetadata($package);
 			}
 
 			$packageMetadataRegistry = new PackageMetadataRegistry(...$packages);
@@ -43,11 +51,11 @@ final readonly class Scanner implements ScannerInterface
 		return $this->loadRegistry();
 	}
 
-	private function makePackageMetadata(PackageInterface $package): PackageMetadataInterface
+	private function makePackageMetadata(PackageInterface $package): void
 	{
 		$packageName = $package->getName();
 		$fileName    = str_replace(['/', '\\'], '_', $packageName) . '.metadata';
-		$filePath    = $this->pathResolver->resolve("vendor/.skernel/$fileName");
+		$filePath    = $this->cacheDir . DIRECTORY_SEPARATOR . $fileName;
 
 		if (file_exists($filePath)) {
 			$content = file_get_contents($filePath);
@@ -58,12 +66,16 @@ final readonly class Scanner implements ScannerInterface
 			$metadata = unserialize($content);
 			if ($metadata instanceof PackageMetadataInterface) {
 				if ($metadata->getReference() === $package->getReference()) {
-					return $metadata;
+					return;
 				}
 			}
 		}
 
-		return new PackageMetadataFactory($this->pathResolver)->create($package);
+		$packageMetadata = new PackageMetadataFactory($this->pathResolver)->create($package);
+
+		if (file_put_contents($filePath, serialize($packageMetadata)) === false) {
+			throw new RuntimeException("IO Error: Unable to write metadata file for package '$packageName'.");
+		}
 	}
 
 	private function loadRegistry(): PackageMetadataRegistryInterface
