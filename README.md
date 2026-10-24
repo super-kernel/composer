@@ -77,7 +77,8 @@ parameters are `PackageParserInterface`, `ClassMapBuilder`, `VendorDirInterface`
 order.
 `ClassMapBuilder` receives `ClassNameParserInterface` through constructor injection. Tokenizer binds `ClassNameParser`
 with `Provider(ClassNameParserInterface::class)`. Directly constructed builders still accept any implementation of
-that interface.
+that interface. The builder opens each candidate file as a Tokenizer `FileStream`, passes it to `parse()`, and closes
+it afterwards; a candidate that cannot be opened is skipped.
 Storage and parsing must use the supplied vendor directory; storage must be shared with the scan
 child. Supply a custom `PackageLocatorInterface` through `PackageParser`'s required third constructor parameter.
 The reconciler constructor accepts `PackageParserInterface` and requires an explicit processor. Construction
