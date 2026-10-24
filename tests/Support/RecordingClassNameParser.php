@@ -22,14 +22,4 @@ final class RecordingClassNameParser implements ClassNameParserInterface
 
         return new ClassNameParser()->parse($stream);
     }
-
-    /**
-     * @noinspection PhpDeprecationInspection The interface still declares the deprecated method until it is removed.
-     */
-    public function parseFile(string $file): array|false
-    {
-        $this->files[] = $file;
-
-        return new ClassNameParser()->parseFile($file);
-    }
 }
