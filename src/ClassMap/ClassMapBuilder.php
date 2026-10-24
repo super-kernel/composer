@@ -7,6 +7,7 @@ namespace SuperKernel\Composer\ClassMap;
 use FilesystemIterator;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
+use RuntimeException;
 use SuperKernel\Composer\Contract\PackageInterface;
 use SuperKernel\Composer\Contract\ScanRuleInterface;
 use SuperKernel\Composer\Contract\ScanRuleSetInterface;
@@ -16,6 +17,7 @@ use SuperKernel\Composer\Enum\ScanRuleSource;
 use SuperKernel\Composer\Exception\ClassMapScanException;
 use SuperKernel\Composer\Path\FilesystemPath;
 use SuperKernel\Tokenizer\Contract\ClassNameParserInterface;
+use SuperKernel\Tokenizer\Stream\FileStream;
 use Throwable;
 
 use function array_keys;
@@ -100,7 +102,17 @@ final readonly class ClassMapBuilder
         $selectedClasses = [];
 
         foreach ($filePaths as $file) {
-            $classNames = $this->classNameParser->parseFile($file);
+            try {
+                $stream = new FileStream($file);
+            } catch (RuntimeException) {
+                continue;
+            }
+
+            try {
+                $classNames = $this->classNameParser->parse($stream);
+            } finally {
+                $stream->close();
+            }
 
             if (false === $classNames) {
                 continue;
