@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Model;
 
+use SuperKernel\Composer\Constants\ScanRuleKind;
+use SuperKernel\Composer\Constants\ScanRuleSource;
 use SuperKernel\Composer\Contract\ScanRuleInterface;
-use SuperKernel\Composer\Enum\ScanRuleKind;
-use SuperKernel\Composer\Enum\ScanRuleSource;
 
 final readonly class ScanRule implements ScanRuleInterface
 {

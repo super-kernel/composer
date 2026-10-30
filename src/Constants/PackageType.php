@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SuperKernel\Composer\Enum;
+namespace SuperKernel\Composer\Constants;
 
 /**
  * Composer's built-in and reserved package types, plus the metadata view's sole root package.

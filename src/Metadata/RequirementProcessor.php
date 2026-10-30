@@ -8,15 +8,7 @@ use stdClass;
 use SuperKernel\Composer\Contract\DependencyInterface;
 use SuperKernel\Composer\Exception\LockFileException;
 use SuperKernel\Composer\Exception\ManifestException;
-use SuperKernel\Composer\Model\Dependency;
-use SuperKernel\Composer\Model\EnvironmentRequirement;
 use SuperKernel\Contract\EnvironmentRequirementInterface;
-
-use function get_object_vars;
-use function is_string;
-use function property_exists;
-use function sprintf;
-use function usort;
 
 /**
  * Validates Composer requirement sections and separates package dependencies from environment requirements.
@@ -38,7 +30,7 @@ final readonly class RequirementProcessor
      */
     public static function root(stdClass $manifest, string $packageName): self
     {
-        return self::process(
+        return new self(...RequirementSectionParser::parse(
             $manifest,
             $packageName,
             'root composer.json',
@@ -53,7 +45,7 @@ final readonly class RequirementProcessor
                 ],
             ],
             ManifestException::class,
-        );
+        ));
     }
 
     /**
@@ -65,7 +57,7 @@ final readonly class RequirementProcessor
      */
     public static function locked(stdClass $package, string $packageName, string $context): self
     {
-        return self::process(
+        return new self(...RequirementSectionParser::parse(
             $package,
             $packageName,
             $context,
@@ -76,7 +68,7 @@ final readonly class RequirementProcessor
                 ],
             ],
             LockFileException::class,
-        );
+        ));
     }
 
     /**
@@ -93,96 +85,5 @@ final readonly class RequirementProcessor
     public function environmentRequirements(): array
     {
         return $this->environmentRequirements;
-    }
-
-    /**
-     * @param list<array{string, bool}>                         $sections
-     * @param class-string<ManifestException|LockFileException> $exceptionClass
-     *
-     * @throws ManifestException|LockFileException When requirement metadata is invalid
-     */
-    private static function process(
-        stdClass $package,
-        string   $packageName,
-        string   $context,
-        array    $sections,
-        string   $exceptionClass,
-    ): self
-    {
-        $dependencies = [];
-        $environmentRequirements = [];
-        $seen = [];
-
-        foreach ($sections as [$field, $dev]) {
-            if (!property_exists($package, $field)) {
-                continue;
-            }
-
-            $requirements = $package->{$field};
-
-            if (!$requirements instanceof stdClass) {
-                throw new $exceptionClass(sprintf('%s %s must be an object.', $context, $field));
-            }
-
-            foreach (get_object_vars($requirements) as $name => $constraint) {
-                if (!ComposerPackageName::isRequirement($name)) {
-                    throw new $exceptionClass(sprintf(
-                        'Requirement name "%s" in %s %s is invalid or not lowercase.',
-                        $name,
-                        $context,
-                        $field,
-                    ));
-                }
-
-                if (!is_string($constraint)) {
-                    throw new $exceptionClass(sprintf(
-                        'Requirement constraint for "%s" in %s %s must be a string.',
-                        $name,
-                        $context,
-                        $field,
-                    ));
-                }
-
-                if (isset($seen[$name])) {
-                    throw new $exceptionClass(sprintf(
-                        'Requirement "%s" must not appear in both require and require-dev.',
-                        $name,
-                    ));
-                }
-
-                $seen[$name] = true;
-
-                if (ComposerPackageName::isPlatform($name)) {
-                    $environmentRequirements[] = new EnvironmentRequirement(
-                        $name,
-                        $constraint,
-                        $packageName,
-                        $dev,
-                    );
-
-                    continue;
-                }
-
-                $dependencies[] = new Dependency(
-                    $name,
-                    $constraint,
-                    $dev,
-                );
-            }
-        }
-
-        usort(
-            $dependencies,
-            static fn(Dependency $left, Dependency $right): int => $left->name() <=> $right->name(),
-        );
-        usort(
-            $environmentRequirements,
-            static fn(
-                EnvironmentRequirement $left,
-                EnvironmentRequirement $right,
-            ): int => $left->name() <=> $right->name(),
-        );
-
-        return new self($dependencies, $environmentRequirements);
     }
 }

@@ -4,18 +4,16 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Metadata;
 
-use stdClass;
 use SuperKernel\Attribute\Provider;
-use SuperKernel\Composer\Contract\ComposerAutoloadInterface;
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Composer\Contract\ComposerPackageInterface;
 use SuperKernel\Composer\Contract\PackageInterface;
 use SuperKernel\Composer\Contract\PackageLocatorInterface;
 use SuperKernel\Composer\Contract\PackageParserInterface;
-use SuperKernel\Composer\Enum\PackageType;
 use SuperKernel\Composer\Exception\AutoloadRuleException;
 use SuperKernel\Composer\Exception\LockFileException;
-use SuperKernel\Composer\Exception\ManifestException;
 use SuperKernel\Composer\Exception\PackageLocationException;
+use SuperKernel\Composer\Metadata\Autoload\AutoloadRuleInput;
 use SuperKernel\Composer\Model\Package;
 use SuperKernel\Composer\Model\ScanRuleSet;
 use SuperKernel\Composer\Path\FilesystemPath;
@@ -46,13 +44,13 @@ final readonly class PackageParser implements PackageParserInterface
             return (string) $this->basePath;
         }
 
-        $type = self::composerType($metadata);
+        $type = RuntimePackageFields::composerType($metadata);
 
-        if ('metapackage' === $type) {
+        if (PackageType::Metapackage->value === $type) {
             return null;
         }
 
-        $name = self::name($metadata);
+        $name = RuntimePackageFields::name($metadata);
         $vendorDirectory = (string) $this->vendorDir;
 
         $path = $this->locator->locate($name, $type, $vendorDirectory);
@@ -68,9 +66,9 @@ final readonly class PackageParser implements PackageParserInterface
 
     public function parse(ComposerPackageInterface $metadata, ?string $locatedPath): PackageInterface
     {
-        $name = self::name($metadata);
+        $name = RuntimePackageFields::name($metadata);
         $root = PackageType::Root === $metadata->type();
-        $type = self::composerType($metadata);
+        $type = RuntimePackageFields::composerType($metadata);
 
         $requirements = (object) [
             'require'     => (object) $metadata->require(),
@@ -82,11 +80,14 @@ final readonly class PackageParser implements PackageParserInterface
 
         try {
             AutoloadRuleParser::assertSupportedPackageFields((object) $metadata->metadata());
-            $production = AutoloadRuleParser::parse(self::autoload($metadata->autoload()), $locatedPath);
+            $production = AutoloadRuleParser::parse(
+                AutoloadRuleInput::fromAutoload($metadata->autoload()),
+                $locatedPath,
+            );
             $development = $root
                 ? ScanRuleSet::merge(
                     $production,
-                    AutoloadRuleParser::parse(self::autoload($metadata->autoloadDev()), $locatedPath),
+                    AutoloadRuleParser::parse(AutoloadRuleInput::fromAutoload($metadata->autoloadDev()), $locatedPath),
                 )
                 : null;
         } catch (AutoloadRuleException $exception) {
@@ -120,36 +121,10 @@ final readonly class PackageParser implements PackageParserInterface
         $root = PackageType::Root === $metadata->type();
 
         return [
-            ...AutoloadRuleParser::files(self::autoload($metadata->autoload()), $locatedPath),
-            ...($root ? AutoloadRuleParser::files(self::autoload($metadata->autoloadDev()), $locatedPath) : []),
+            ...AutoloadRuleParser::files(AutoloadRuleInput::fromAutoload($metadata->autoload()), $locatedPath),
+            ...($root
+                ? AutoloadRuleParser::files(AutoloadRuleInput::fromAutoload($metadata->autoloadDev()), $locatedPath)
+                : []),
         ];
-    }
-
-    private static function autoload(ComposerAutoloadInterface $autoload): stdClass
-    {
-        $rules = $autoload->classRules();
-
-        return (object) [
-            'psr-0'                 => (object) $rules['psr-0'],
-            'psr-4'                 => (object) $rules['psr-4'],
-            'classmap'              => $rules['classmap'],
-            'exclude-from-classmap' => $rules['exclude-from-classmap'],
-            'files'                 => $autoload->files(),
-        ];
-    }
-
-    private static function composerType(ComposerPackageInterface $metadata): string
-    {
-        $type = $metadata->type();
-
-        return PackageType::Root === $type
-            ? ($metadata->metadata()['type'] ?? 'library')
-            : ($type instanceof PackageType ? $type->value : $type);
-    }
-
-    /** @throws ManifestException When the runtime root does not declare a package name */
-    private static function name(ComposerPackageInterface $metadata): string
-    {
-        return $metadata->name() ?? throw new ManifestException('Root composer.json must declare a string name.');
     }
 }

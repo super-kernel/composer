@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Contract;
 
-use SuperKernel\Composer\Enum\PackageType;
+use SuperKernel\Composer\Constants\PackageType;
 
 /**
  * Provides a unified view of the root package and locked packages without executing runtime code.

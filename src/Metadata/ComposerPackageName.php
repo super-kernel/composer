@@ -25,11 +25,11 @@ final class ComposerPackageName
 
     public static function isExtension(string $name): bool
     {
-        return str_starts_with($name, 'ext-') && self::isPlatform($name);
+        return str_starts_with($name, 'ext-') && 1 === preg_match(self::PLATFORM_PATTERN, $name);
     }
 
     public static function isRequirement(string $name): bool
     {
-        return self::isPackage($name) || self::isPlatform($name);
+        return 1 === preg_match(self::PACKAGE_PATTERN, $name) || 1 === preg_match(self::PLATFORM_PATTERN, $name);
     }
 }

@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Metadata;
 
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Composer\Contract\ComposerAutoloadInterface;
 use SuperKernel\Composer\Contract\ComposerPackageInterface;
-use SuperKernel\Composer\Enum\PackageType;
 use SuperKernel\Composer\Exception\ComposerFileException;
 
 use function array_keys;
@@ -61,10 +61,10 @@ final readonly class ComposerPackage implements ComposerPackageInterface
 
     public function extensions(bool $includeDev = true): array
     {
-        $requirements = $this->require();
+        $requirements = $this->fields['require'] ?? [];
 
         if ($includeDev) {
-            $requirements += $this->requireDev();
+            $requirements += $this->fields['require-dev'] ?? [];
         }
 
         $extensions = [];

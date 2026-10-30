@@ -5,11 +5,11 @@ declare(strict_types=1);
 namespace SuperKernel\Composer\Model;
 
 use InvalidArgumentException;
+use SuperKernel\Composer\Constants\AutoloadScope;
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Composer\Contract\DependencyInterface;
 use SuperKernel\Composer\Contract\PackageInterface;
 use SuperKernel\Composer\Contract\ScanRuleSetInterface;
-use SuperKernel\Composer\Enum\AutoloadScope;
-use SuperKernel\Composer\Enum\PackageType;
 use SuperKernel\Composer\Metadata\ComposerPackageName;
 use SuperKernel\Contract\EnvironmentRequirementInterface;
 

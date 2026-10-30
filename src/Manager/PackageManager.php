@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace SuperKernel\Composer\Manager;
 
 use InvalidArgumentException;
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Composer\Contract\PackageInterface;
-use SuperKernel\Composer\Enum\PackageType;
 use SuperKernel\Contract\EnvironmentRequirementInterface;
 use SuperKernel\Contract\PackageManagerInterface;
 

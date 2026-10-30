@@ -6,11 +6,11 @@ namespace SuperKernel\Composer\Provider;
 
 use SuperKernel\Attribute\FactoryProvider;
 use SuperKernel\Composer\Contract\ComposerMetadataInterface;
-use SuperKernel\Composer\Contract\PackageInterface;
 use SuperKernel\Composer\Contract\PackageReconcilerInterface;
 use SuperKernel\Composer\Exception\ComposerFileException;
 use SuperKernel\Composer\Exception\PackageCacheException;
 use SuperKernel\Composer\Exception\PackageLocationException;
+use SuperKernel\Composer\Manager\AutoloadFileOrder;
 use SuperKernel\Composer\Manager\PackageManager;
 use SuperKernel\Contract\PackageManagerInterface;
 use SuperKernel\Contract\VendorDirInterface;
@@ -42,7 +42,32 @@ final readonly class PackageManagerProvider
         VendorDirInterface         $vendorDir,
     ): PackageManagerInterface
     {
-        $installation = self::installationState($vendorDir);
+        // Only installation mode and membership are read; manifest and lock remain the package-data authority.
+        $path = $vendorDir . '/composer/installed.php';
+
+        if (!is_file($path) || !is_readable($path)) {
+            throw new ComposerFileException(sprintf('Composer installation state is unavailable: %s.', $path));
+        }
+
+        try {
+            $state = (static fn(): mixed => require $path)();
+        } catch (Throwable $exception) {
+            throw new ComposerFileException(
+                sprintf('Cannot read Composer installation state: %s.', $path),
+                0,
+                $exception,
+            );
+        }
+
+        if (!is_array($state) || !is_array($state['root'] ?? null)
+            || !is_bool($state['root']['dev'] ?? null) || !is_array($state['versions'] ?? null)) {
+            throw new ComposerFileException(sprintf('Invalid Composer installation state: %s.', $path));
+        }
+
+        $installation = [
+            'dev'      => $state['root']['dev'],
+            'versions' => $state['versions'],
+        ];
         $packages = [];
 
         foreach ($metadata->all() as $package) {
@@ -73,74 +98,9 @@ final readonly class PackageManagerProvider
         $files = [];
 
         foreach (array_keys($byName) as $name) {
-            self::appendAutoloadFiles($name, $byName, $autoloadFiles, $seen, $files);
+            AutoloadFileOrder::append($name, $byName, $autoloadFiles, $seen, $files);
         }
 
         return new PackageManager($root, $packages, $classes, array_keys($files));
-    }
-
-    /**
-     * Reads only installation mode and membership; manifest and lock remain the package-data authority.
-     *
-     * @return array{dev: bool, versions: array<string, mixed>}
-     *
-     * @throws ComposerFileException When the generated installation state is unavailable or invalid
-     */
-    private static function installationState(VendorDirInterface $vendorDir): array
-    {
-        $path = $vendorDir . '/composer/installed.php';
-
-        if (!is_file($path) || !is_readable($path)) {
-            throw new ComposerFileException(sprintf('Composer installation state is unavailable: %s.', $path));
-        }
-
-        try {
-            $state = (static fn(): mixed => require $path)();
-        } catch (Throwable $exception) {
-            throw new ComposerFileException(
-                sprintf('Cannot read Composer installation state: %s.', $path),
-                0,
-                $exception,
-            );
-        }
-
-        if (!is_array($state) || !is_array($state['root'] ?? null)
-            || !is_bool($state['root']['dev'] ?? null) || !is_array($state['versions'] ?? null)) {
-            throw new ComposerFileException(sprintf('Invalid Composer installation state: %s.', $path));
-        }
-
-        return [
-            'dev'      => $state['root']['dev'],
-            'versions' => $state['versions'],
-        ];
-    }
-
-    /**
-     * @param array<string, PackageInterface>       $packages
-     * @param array<string, list<non-empty-string>> $autoloadFiles
-     * @param array<string, true>                   $seen
-     * @param array<non-empty-string, true>         $files
-     */
-    private static function appendAutoloadFiles(
-        string $name,
-        array  $packages,
-        array  $autoloadFiles,
-        array &$seen,
-        array &$files,
-    ): void
-    {
-        if (isset($seen[$name]) || !isset($packages[$name])) {
-            return;
-        }
-
-        $seen[$name] = true;
-
-        foreach ($packages[$name]->dependencies() as $dependency) {
-            self::appendAutoloadFiles($dependency->name(), $packages, $autoloadFiles, $seen, $files);
-        }
-
-        foreach ($autoloadFiles[$name] as $file) {
-            $files[$file] = true;
-        }
     }
 }

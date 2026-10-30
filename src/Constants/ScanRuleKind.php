@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SuperKernel\Composer\Enum;
+namespace SuperKernel\Composer\Constants;
 
 enum ScanRuleKind: string
 {

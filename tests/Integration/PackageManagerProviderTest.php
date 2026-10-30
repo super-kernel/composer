@@ -391,6 +391,12 @@ final class PackageManagerProviderTest extends TestCase
         ]);
     }
 
+    /**
+     * The native return type narrows the provider's interface result to the PackageManager it constructs, whose
+     * autoloadFiles() the assertions inspect.
+     *
+     * @noinspection PhpIncompatibleReturnTypeInspection
+     */
     private function manager(string $root, PackageReconcilerInterface $reconciler): PackageManager
     {
         $metadata = new ComposerMetadata(new BasePath($root));

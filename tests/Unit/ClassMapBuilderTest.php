@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SuperKernel\Composer\Tests\Unit;
 
 use SuperKernel\Composer\ClassMap\ClassMapBuilder;
-use SuperKernel\Composer\Enum\PackageType;
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Composer\Tests\Support\TestCase;
 use SuperKernel\Tokenizer\ClassNameParser;
 use Throwable;

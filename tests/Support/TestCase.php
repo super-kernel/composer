@@ -55,6 +55,11 @@ abstract class TestCase extends PhpUnitTestCase
 {
     /**
      * Exercises the runtime adapter against a temporary workspace with explicit installation state.
+     *
+     * The native return type narrows the provider's interface result to the PackageManager it constructs, whose
+     * autoloadFiles() the assertions inspect.
+     *
+     * @noinspection PhpIncompatibleReturnTypeInspection
      */
     final protected function readPackages(
         string                   $projectRoot,

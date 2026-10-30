@@ -6,10 +6,10 @@ namespace SuperKernel\Composer\Tests\Unit;
 
 use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\DataProvider;
-use SuperKernel\Composer\Enum\AutoloadScope;
-use SuperKernel\Composer\Enum\PackageType;
-use SuperKernel\Composer\Enum\ScanRuleKind;
-use SuperKernel\Composer\Enum\ScanRuleSource;
+use SuperKernel\Composer\Constants\AutoloadScope;
+use SuperKernel\Composer\Constants\PackageType;
+use SuperKernel\Composer\Constants\ScanRuleKind;
+use SuperKernel\Composer\Constants\ScanRuleSource;
 use SuperKernel\Composer\Model\Package;
 use SuperKernel\Composer\Model\ScanRule;
 use SuperKernel\Composer\Model\ScanRuleSet;

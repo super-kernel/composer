@@ -34,24 +34,21 @@ final readonly class BasePathProvider
      */
     public function __invoke(?iterable $detectors = null): BasePathInterface
     {
-        foreach ($detectors ?? $this->detectors() as $detector) {
+        // The default sequence is a generator, so detectors after the selected one are never constructed.
+        $detectors ??= (static function (): iterable {
+            yield new NullDetector();
+            yield new ComposerScriptDetector();
+            yield new ScriptDetector();
+            yield new WorkingDirectoryDetector();
+            yield new ComponentDetector();
+        })();
+
+        foreach ($detectors as $detector) {
             if ($detector->support()) {
                 return new BasePath($detector->projectDirectory());
             }
         }
 
         throw new ProjectRootNotFoundException('No detector supports the current project environment.');
-    }
-
-    /**
-     * @return iterable<DetectorInterface>
-     */
-    private function detectors(): iterable
-    {
-        yield new NullDetector();
-        yield new ComposerScriptDetector();
-        yield new ScriptDetector();
-        yield new WorkingDirectoryDetector();
-        yield new ComponentDetector();
     }
 }

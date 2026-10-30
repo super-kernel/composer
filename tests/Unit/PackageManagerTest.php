@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace SuperKernel\Composer\Tests\Unit;
 
 use InvalidArgumentException;
-use SuperKernel\Composer\Enum\PackageType;
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Composer\Manager\PackageManager;
 use SuperKernel\Composer\Model\EnvironmentRequirement;
 use SuperKernel\Composer\Model\Package;
