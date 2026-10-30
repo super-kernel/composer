@@ -22,26 +22,18 @@ final readonly class ComposerAutoload implements ComposerAutoloadInterface
 
     public function classRules(): array
     {
+        $namespacePaths = static fn($paths): array => is_string($paths)
+            ? [
+                $paths,
+            ]
+            : array_values(array_unique($paths));
+
         return [
-            'psr-0'                 => $this->namespaceRules('psr-0'),
-            'psr-4'                 => $this->namespaceRules('psr-4'),
+            'psr-0'                 => array_map($namespacePaths, $this->fields['psr-0'] ?? []),
+            'psr-4'                 => array_map($namespacePaths, $this->fields['psr-4'] ?? []),
             'classmap'              => array_values(array_unique($this->fields['classmap'] ?? [])),
             'exclude-from-classmap' => array_values(array_unique($this->fields['exclude-from-classmap'] ?? [])),
         ];
-    }
-
-    /**
-     * @return array<string, list<string>>
-     */
-    private function namespaceRules(string $source): array
-    {
-        return array_map(function ($paths) {
-            return is_string($paths)
-                ? [
-                    $paths,
-                ]
-                : array_values(array_unique($paths));
-        }, $this->fields[$source] ?? []);
     }
 
     public function files(): array

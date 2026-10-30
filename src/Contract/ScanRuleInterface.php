@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Contract;
 
-use SuperKernel\Composer\Enum\ScanRuleKind;
-use SuperKernel\Composer\Enum\ScanRuleSource;
+use SuperKernel\Composer\Constants\ScanRuleKind;
+use SuperKernel\Composer\Constants\ScanRuleSource;
 
 /**
  * Describes one safe package-root-relative autoload scan inclusion.

@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Tests\Unit;
 
+use SuperKernel\Composer\Constants\AutoloadScope;
 use SuperKernel\Composer\Contract\ScanRuleInterface;
-use SuperKernel\Composer\Enum\AutoloadScope;
 use SuperKernel\Composer\Exception\AutoloadRuleException;
 use SuperKernel\Composer\Exception\LockFileException;
 use SuperKernel\Composer\Exception\PackageLocationException;

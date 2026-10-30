@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Contract;
 
-use SuperKernel\Composer\Enum\AutoloadScope;
-use SuperKernel\Composer\Enum\PackageType;
+use SuperKernel\Composer\Constants\AutoloadScope;
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Contract\EnvironmentRequirementInterface;
 use SuperKernel\Contract\PackageMetadataInterface;
 

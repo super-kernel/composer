@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Tests\Unit;
 
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Composer\Contract\ComposerMetadataInterface;
 use SuperKernel\Composer\Contract\ComposerPackageInterface;
-use SuperKernel\Composer\Enum\PackageType;
 use SuperKernel\Composer\Exception\ComposerFileException;
 use SuperKernel\Composer\Exception\PackageNotFoundException;
 use SuperKernel\Composer\Metadata\ComposerMetadata;

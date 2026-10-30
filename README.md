@@ -114,8 +114,9 @@ The checksum detects inconsistent data and does not authenticate local filesyste
 each package file atomically through a temporary file in the same directory; concurrent writers are not coordinated
 across packages.
 
-`PackageReconciler` owns serialization and restoration directly. It reads only the per-package layout above;
-unrecognized cache artifacts remain untouched. Rebuild caches through a scanning processor before packaging Phar.
+`PackageReconciler` owns serialization and restoration through its internal cache storage. It reads only the
+per-package layout above; unrecognized cache artifacts remain untouched. Rebuild caches through a scanning processor
+before packaging Phar.
 
 ## Project root detection
 
@@ -196,7 +197,7 @@ reader methods continue to return `ComposerJsonInterface` and `ComposerLockInter
 `vendorDirectory` for reverse project discovery or validates that configuration as a filesystem path.
 
 ```php
-use SuperKernel\Composer\Enum\PackageType;
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Composer\Metadata\ComposerMetadata;
 use SuperKernel\Composer\Path\BasePath;
 

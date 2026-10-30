@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Contract;
 
-use SuperKernel\Composer\Enum\PackageType;
+use SuperKernel\Composer\Constants\PackageType;
 
 /**
  * Provides normalized native fields for one root or lock package, independently of its installation state.

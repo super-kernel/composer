@@ -7,10 +7,10 @@ namespace SuperKernel\Composer\Model;
 use InvalidArgumentException;
 use SuperKernel\Composer\Contract\ScanRuleInterface;
 use SuperKernel\Composer\Contract\ScanRuleSetInterface;
+use SuperKernel\Composer\Metadata\Autoload\ScanRuleCollector;
 
 use function array_any;
 use function array_filter;
-use function array_push;
 use function array_unique;
 use function array_values;
 use function explode;
@@ -101,15 +101,7 @@ final readonly class ScanRuleSet implements ScanRuleSetInterface
      */
     public static function merge(ScanRuleSetInterface ...$sets): ScanRuleSetInterface
     {
-        $inclusions = [];
-        $exclusions = [];
-
-        foreach ($sets as $set) {
-            array_push($inclusions, ...$set->inclusions());
-            array_push($exclusions, ...$set->exclusions());
-        }
-
-        return new self($inclusions, $exclusions);
+        return new self(...ScanRuleCollector::collect(...$sets));
     }
 
     public function inclusions(): array
@@ -142,19 +134,14 @@ final readonly class ScanRuleSet implements ScanRuleSetInterface
 
         return array_any(
             $this->exclusions,
-            fn(string $pattern): bool => 1 === preg_match(self::exclusionRegex($pattern), $path),
+            static function (string $pattern) use ($path): bool {
+                $regex = strtr(preg_quote(trim($pattern, '/'), '~'), [
+                    '\\*\\*' => '.+?',
+                    '\\*'    => '[^/]+?',
+                ]);
+
+                return 1 === preg_match('~\\A' . $regex . '(?:\\z|/)~', $path);
+            },
         );
-    }
-
-    private static function exclusionRegex(string $pattern): string
-    {
-        $pattern = trim($pattern, '/');
-        $regex = preg_quote($pattern, '~');
-        $regex = strtr($regex, [
-            '\\*\\*' => '.+?',
-            '\\*'    => '[^/]+?',
-        ]);
-
-        return '~\\A' . $regex . '(?:\\z|/)~';
     }
 }

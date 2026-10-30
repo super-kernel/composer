@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace SuperKernel\Composer\Metadata;
 
 use SuperKernel\Attribute\Provider;
+use SuperKernel\Composer\Constants\ComposerFile;
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Composer\Contract\ComposerMetadataInterface;
 use SuperKernel\Composer\Contract\ComposerPackageInterface;
-use SuperKernel\Composer\Enum\PackageType;
 use SuperKernel\Composer\Exception\ComposerFileException;
 use SuperKernel\Composer\Exception\PackageNotFoundException;
 use SuperKernel\Composer\Path\FilesystemPath;
@@ -57,8 +58,8 @@ final readonly class ComposerMetadata implements ComposerMetadataInterface
             );
         }
 
-        $json = ComposerFileReader::readComposerJson($root . '/composer.json');
-        $lock = ComposerFileReader::readComposerLock($root . '/composer.lock');
+        $json = ComposerFileReader::readComposerJson($root . '/' . ComposerFile::Json->value);
+        $lock = ComposerFileReader::readComposerLock($root . '/' . ComposerFile::Lock->value);
         $this->root = new ComposerPackage($json->all(), root: true);
         $byName = [];
         $packages = [];

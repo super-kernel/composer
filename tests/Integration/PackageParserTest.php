@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace SuperKernel\Composer\Tests\Integration;
 
+use SuperKernel\Composer\Constants\AutoloadScope;
+use SuperKernel\Composer\Constants\PackageType;
 use SuperKernel\Composer\Contract\DependencyInterface;
 use SuperKernel\Composer\Contract\PackageInterface;
 use SuperKernel\Composer\Contract\PackageLocatorInterface;
-use SuperKernel\Composer\Enum\AutoloadScope;
-use SuperKernel\Composer\Enum\PackageType;
 use SuperKernel\Composer\Exception\ComposerFileException;
 use SuperKernel\Composer\Exception\LockFileException;
 use SuperKernel\Composer\Exception\ManifestException;
