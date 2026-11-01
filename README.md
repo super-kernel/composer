@@ -1,163 +1,26 @@
+<p align="right">
+  <strong>English</strong> | <a href="README.zh-CN.md">中文文档</a>
+</p>
+
 # SuperKernel Composer Metadata
 
-`super-kernel/composer` reads root `composer.json` and `composer.lock` metadata and provides package graphs, class maps,
-and class ownership on demand. Applications load Composer's generated `vendor/autoload.php`; package discovery begins
-when a caller requests `PackageManagerProvider` or its DI service. Loading the component does not scan packages,
-register an SPL loader, or execute package file-autoload declarations.
+`super-kernel/composer` reads the root `composer.json` and `composer.lock` metadata and provides package graphs, class maps, and class ownership on demand. Applications load Composer's generated `vendor/autoload.php`; package discovery begins only when a caller requests `PackageManagerProvider` or its DI service. Loading the component does not scan packages, register an SPL loader, or execute package file-autoload declarations.
 
-`super-kernel/composer` requires `super-kernel/attribute`, `super-kernel/contract`, `super-kernel/tokenizer`, and
-`super-kernel/scan-isolation`. The reconciler writes its cache directly below the injected `VendorDirInterface` directory.
+## Project root and vendor directory
 
-## Loading and package metadata
+`SuperKernel\Contract\BasePathInterface` is the project root, a `Stringable` value. `Provider\BasePathProvider` supplies it and tries these detectors in order:
 
-Load the application's generated Composer entry, then resolve services through its DI container (`$container`):
-
-```php
-require '/srv/application/vendor/autoload.php';
-
-$packages = $container->get(SuperKernel\Contract\PackageManagerInterface::class);
-```
-
-Composer retains its loader and executes its declared file-autoload entries.
-
-`Model\Package` represents both the root and every locked package, including `super-kernel/composer` itself.
-The self package uses its lock entry for type, version, reference, dependencies, environment requirements, development
-membership, and autoload declarations. It follows the same location and scan validation as other packages.
-
-## Package reconciliation
-
-`ComposerMetadata` reads native package data from the project's manifest and lock file.
-`PackageManagerProvider::__invoke()` requires a `PackageReconcilerInterface`, a `ComposerMetadataInterface` snapshot, and the matching `VendorDirInterface`.
-It selects runtime entries from `metadata->all()` and the additional `metadata->root()`, reconciles them, and constructs
-a fresh `PackageManager` from the returned instances, their class maps, and dependency-ordered file autoloads. Root
-retains first precedence in the manager. The metadata and reconciler must describe the same workspace.
-The component-local `Contract\PackageReconcilerInterface` exposes `reconcile()`, `classes()`, and `autoloadFiles()`;
-`Cache\PackageReconciler` implements it and carries `Provider(PackageReconcilerInterface::class)` directly.
-
-`PackageReconciler` owns the scan processor. For every given `ComposerPackageInterface`, it checks processor support
-and invokes one callback. Inside that callback it reads and deserializes an existing package cache and compares
-`reference()` with the current native record. Equal references reuse the instance and its derived data, including
-when both references are null. Missing, invalid, or different-reference records are parsed, scanned through Tokenizer,
-and written immediately. Root is always reparsed and rescanned with production plus development rules.
-
-After the processor returns, the reconciler reads the package file again and returns the newly deserialized instance.
-That final read is authoritative, including a valid update published before it runs. Missing, unreadable, incompatible,
-or corrupted data raises `PackageCacheException`; the callback's in-memory result cannot replace this read.
-Each successful package publication is independent. A later package failure preserves earlier successful writes.
-Only packages in the current metadata are included in the next manager, even when older cache files remain.
-
-Manager construction changes neither SPL registration nor file-autoload execution. The DI container owns shared
-instance retention; previously returned managers retain their prepared graphs.
-
-Factory providers retain their DI bindings and require their service dependencies explicitly. The temporary container
-used before DI is ready resolves those dependencies; providers never instantiate fallback providers. Direct callers
-must supply the same services. `PackageManagerProvider` does not detect a workspace, and
-`PackageReconciler` requires an injected parser instead of constructing one from a base path or locator.
-
-```php
-use SuperKernel\Composer\Cache\PackageReconciler;
-use SuperKernel\Composer\ClassMap\ClassMapBuilder;
-use SuperKernel\Composer\Locator\PackageLocator;
-use SuperKernel\Composer\Metadata\PackageParser;
-use SuperKernel\Composer\Provider\PackageManagerProvider;
-
-// Direct composition from already-resolved services for one workspace.
-$parser = new PackageParser($basePath, $vendorDir, new PackageLocator());
-$reconciler = new PackageReconciler(
-    $parser,
-    new ClassMapBuilder($classNameParser),
-    $vendorDir,
-    $scanProcessor,
-);
-$packages = new PackageManagerProvider()($reconciler, $metadata, $vendorDir);
-```
-
-`PackageReconciler` is marked with `Provider(PackageReconcilerInterface::class)`. Its four required constructor
-parameters are `PackageParserInterface`, `ClassMapBuilder`, `VendorDirInterface`, and `ScanProcessorInterface`, in that
-order.
-`ClassMapBuilder` receives `ClassNameParserInterface` through constructor injection. Tokenizer binds `ClassNameParser`
-with `Provider(ClassNameParserInterface::class)`. Directly constructed builders still accept any implementation of
-that interface. The builder reads each candidate file and passes its contents to `parse()`; a candidate that cannot be
-read is skipped.
-Storage and parsing must use the supplied vendor directory; storage must be shared with the scan
-child. Supply a custom `PackageLocatorInterface` through `PackageParser`'s required third constructor parameter.
-The reconciler constructor accepts `PackageParserInterface` and requires an explicit processor. Construction
-does not probe the processor, locate packages, read metadata, or allocate storage.
-Inside a Phar archive, `NullScanProcessor` restores existing package files without executing scan callbacks.
-Its `support()` returns false outside Phar, where reconciliation rejects an explicitly injected Null processor.
-The manager provider always uses its supplied metadata snapshot without path detection or repeated manifest/lock reads.
-To observe changed lock entries, supply a new snapshot. Missing or invalid package caches fail. An enclosing isolated
-bootstrap can supply a `PhaseScanProcessor` to execute nested callbacks in its false phase and restore their caches
-in its true phase.
-Package location is checked before cache access, including on cache hits and with a `NullScanProcessor`; an injected
-locator is also consulted on each reconciliation. A missing directory raises `PackageLocationException` and aborts
-runtime initialization. If a restored record points to a different directory, that directory must also still exist.
-Dependency metadata or source edits under an unchanged reference intentionally reuse the cached package. Refresh the
-reference or remove that package's cache to force a rebuild. Root changes are picked up by its unconditional scan.
-
-## Serialized package caches
-
-Each package has its own serialized file, for example:
-
-```text
-<vendor>/.cache/classes/acme/dependency.ser
-```
-
-The actual vendor directory comes from `VendorDirInterface`. The serialized array contains the runtime package
-instance, class map, ordered file autoloads, vendor-directory binding, and SHA-256 checksum.
-Restoration uses an explicit class allow-list and verifies the package identity, Root or dependency role, workspace,
-record structure, initialized Package property layout, and checksum. Removed or missing properties are rejected.
-Rebuild package caches after object-layout changes, including removal of the fingerprint field. Normal scanning
-replaces incompatible records; Phar and other restore-only deployments must receive rebuilt snapshots. Cache records have no schema version. Earlier records containing a `schema` field
-are rebuilt during a successful processing pass; restore-only mode requires compatible caches.
-The checksum detects inconsistent data and does not authenticate local filesystem writers. The reconciler publishes
-each package file atomically through a temporary file in the same directory; concurrent writers are not coordinated
-across packages.
-
-`PackageReconciler` owns serialization and restoration through its internal cache storage. It reads only the
-per-package layout above; unrecognized cache artifacts remain untouched. Rebuild caches through a scanning processor
-before packaging Phar.
-
-## Project root detection
-
-`SuperKernel\Contract\BasePathInterface` belongs to `super-kernel/contract`, extends PHP's `Stringable`, and declares
-`__toString(): string`.
-The final readonly `Path\BasePath` value stores the directory supplied by the factory unchanged. Directory validity
-and normalization belong to the factory's detector chain. `Provider\BasePathProvider` is marked for this
-interface and tries these detectors in order:
-
-1. `NullDetector`, implementing `DetectorInterface`, recognizes execution inside an application Phar and returns
-   the archive's internal `phar://...` root using [Phar::running()](https://www.php.net/manual/en/phar.running.php).
-2. `ComposerScriptDetector` recognizes `COMPOSER_DEV_MODE=0` or `1` and checks Composer's working directory.
-   This marker is supplied for [Composer scripts](https://getcomposer.org/doc/articles/scripts.md).
+1. `NullDetector` recognizes execution inside an application Phar and returns the archive's internal `phar://...` root using [Phar::running()](https://www.php.net/manual/en/phar.running.php).
+2. `ComposerScriptDetector` recognizes `COMPOSER_DEV_MODE=0` or `1` and checks Composer's working directory. This marker is supplied for [Composer scripts](https://getcomposer.org/doc/articles/scripts.md).
 3. `ScriptDetector` recognizes an existing PHP entry script and checks the directory returned by `getcwd()`.
 4. `WorkingDirectoryDetector` checks `getcwd()` without requiring an entry script.
-5. `ComponentDetector` checks the current working directory for both `composer.json` and `composer.lock`,
-   supporting standalone use when launched from the component root.
+5. `ComponentDetector` checks the current working directory for both `composer.json` and `composer.lock`, supporting standalone use when launched from the component root.
 
-Each `DetectorInterface` implementation captures its environment, exposes `support(): bool`, and returns its detected
-path through `projectDirectory(): string`, returning an empty string when unsupported. Call `support()` before using
-the directory. The factory constructs a fresh root value from the first supported detector; later detectors are not
-evaluated. Only the factory throws `ProjectRootNotFoundException` when no detector supports the environment. The selected
-detector supplies a valid canonical directory; `BasePath` trusts this internal contract without further checks.
+The first supported detector wins; later detectors are not evaluated. When none supports the environment, the provider throws `ProjectRootNotFoundException`. Filesystem detectors inspect only the directory returned by [getcwd()](https://www.php.net/manual/en/function.getcwd.php) and require `composer.json`; the component detector also requires `composer.lock`. They do not traverse parent directories or infer the root from the entry script or installation location, so launch PHP from the project root, including when running a script elsewhere by path. Detection checks file locations without parsing their contents.
 
-Filesystem detectors inspect only the directory returned by [getcwd()](https://www.php.net/manual/en/function.getcwd.php).
-They require `composer.json`; the component detector also requires `composer.lock`. They do not traverse parent
-directories or infer the application root from the entry script or component installation location.
-Launch PHP from the project root, including when using a relative or absolute path to a script elsewhere.
-Detection checks file locations without parsing their contents or inspecting `config.vendor-dir` or an installation.
-`ComposerMetadata` reads and validates the located documents, preserving `config.vendor-dir` in root package
-data for `VendorDirProvider` to resolve. Neither detection nor native metadata reading requires installed dependencies.
-If the working directory changes, pass the previously resolved base path explicitly to `ComposerMetadata`.
-Pass metadata and a reconciler for the same project to the package-manager provider.
+The provider accepts an optional ordered iterable of `DetectorInterface` implementations for custom environments; an explicit empty iterable also fails with `ProjectRootNotFoundException`. A detector exposes `support(): bool` and `projectDirectory(): string`, which returns an empty string when unsupported, and must return a valid canonical directory when supported. Wrap an explicit directory string in `Path\BasePath`.
 
-`SuperKernel\Contract\VendorDirInterface` provides a separate Stringable vendor path value, implemented by the final
-readonly `Path\VendorDir`. `Provider\VendorDirProvider::__invoke()` requires `ComposerMetadataInterface`
-and `BasePathInterface` arguments from the same workspace. It uses the supplied metadata without rereading Composer
-files or detecting a base path.
-The provider reads `config.vendor-dir` from the metadata's root package, defaults to `vendor` when absent, and resolves
-relative paths against the selected base path. It normalizes absolute and Phar paths and canonicalizes existing links.
-It creates a fresh value without creating a directory; invalid configured paths raise `ComposerFileException`.
+`SuperKernel\Contract\VendorDirInterface` is the separate `Stringable` dependency directory. `Provider\VendorDirProvider::__invoke()` takes `ComposerMetadataInterface` and `BasePathInterface` from the same project. It reads `config.vendor-dir` from the root package, defaults to `vendor`, resolves relative paths against the base path, normalizes absolute and Phar paths, and canonicalizes existing links. It does not create the directory; an invalid configured path raises `ComposerFileException`.
 
 ```php
 use SuperKernel\Composer\Metadata\ComposerMetadata;
@@ -171,30 +34,11 @@ $vendorDir = new VendorDirProvider()($metadata, $root);
 $vendorDirectory = (string)$vendorDir;
 ```
 
-Consumers that need the dependency directory inject `SuperKernel\Contract\VendorDirInterface` and cast it to a string.
-The temporary container resolves this service before the final DI container is ready. Direct callers explicitly pass
-both metadata and base path to `VendorDirProvider`.
-The package-manager constructor starts with the root package; parsing and cache reconciliation receive
-the vendor value independently. Incompatible snapshots require rebuilding through a scanning processor.
+Consumers that need the dependency directory inject `VendorDirInterface` and cast it to a string. If the working directory changes after detection, pass the previously resolved base path explicitly. Inside a Phar, root detection and manifest/lock reading work from the archive, and package caches must already be prepared beneath the vendor directory; the archive provides no writable cache storage.
 
-The root provider accepts an optional ordered iterable of `DetectorInterface` implementations for custom environments;
-an explicit empty iterable also fails with `ProjectRootNotFoundException`. DI retains its resolved root value and injects
-it into `ComposerMetadata`. Its constructor requires `BasePathInterface $basePath` and does not detect or retain a
-default project path. Wrap explicit directory strings in `Path\BasePath`. Phar path support here covers
-root detection and native manifest/lock reading. Phar execution with `NullScanProcessor` requires matching prebuilt
-cache files beneath the supplied vendor directory; it does not provide writable cache storage inside an archive.
+## Composer metadata
 
-## Structured Composer package data
-
-`Metadata\ComposerMetadata` is marked with `Provider(ComposerMetadataInterface::class)` and
-reads fresh metadata from the project's `composer.json` and `composer.lock` using its required
-`BasePathInterface $basePath` constructor argument. DI resolves and retains the injected base path and metadata instances.
-Direct callers construct `ComposerMetadata` with a base-path value. An explicit root value requires both documents but no installed vendor directory. The single-file
-reader methods continue to return `ComposerJsonInterface` and `ComposerLockInterface` views.
-
-`ComposerMetadataInterface` exposes package data only. Project and vendor directory access belongs to
-`BasePathInterface` and `VendorDirInterface`. Metadata construction accepts a project root, and no longer accepts
-`vendorDirectory` for reverse project discovery or validates that configuration as a filesystem path.
+`Metadata\ComposerMetadata` supplies `ComposerMetadataInterface`. It reads fresh metadata from the project's `composer.json` and `composer.lock` through its required `BasePathInterface $basePath` argument, needs both documents but no installed vendor directory, and never consults installation state, dependency manifests, plugins, scripts, or the network. Its single-file reader methods return `ComposerJsonInterface` and `ComposerLockInterface` views.
 
 ```php
 use SuperKernel\Composer\Constants\PackageType;
@@ -217,159 +61,75 @@ if ($metadata->has('vendor/package')) {
 }
 ```
 
-The root always has the synthetic `PackageType::Root` type and occurs once in the `Root` group. Its original
-declared type remains in `metadata()`. An unnamed root keeps a null name and is available through `root()`; no synthetic
-package name is invented. `all()` contains only production and development lock packages, sorted by name. `has()` and
-`get()` include named roots and use case-insensitive names. Calling `get()` requires checking `has()` first; a missing
-name raises `PackageNotFoundException`, deliberately without an interface-level `@throws` annotation.
+Root identity, requirements, and autoload declarations come only from the root `composer.json`. Locked names, versions, references, types, runtime requirements, development classification, and autoload declarations come only from `composer.lock` `packages` and `packages-dev`, including `super-kernel/composer` itself.
 
-Known types use `PackageType`; custom types retain their exact strings and their own group keys. There is no
-shared custom-type bucket. The custom type `root` remains distinct from synthetic `Root`; numeric type keys follow PHP's
-array-key conversion. Empty type selections return `[]`, and conflicting package names are rejected.
+The root always has the synthetic `PackageType::Root` type and occurs once in the `Root` group; its declared type remains in `metadata()`. An unnamed root keeps a null name and is available through `root()`. `all()` contains only production and development lock packages, sorted by name. `has()` and `get()` include named roots and use case-insensitive names. Check `has()` before `get()`; a missing name raises `PackageNotFoundException`.
 
-Each `ComposerPackageInterface` exposes native package fields and preserves the original record, including custom
-fields, as recursively normalized arrays. Optional scalar values return null; collection accessors default to `[]`.
-Absent `source` and `dist` return null. License, binary, and comment strings become lists. `version()` preserves the
-declared string without trimming, normalization, inference, or format validation; an omitted root version returns
-null. The framework checks JSON structure and field types, including string versions and required lock-package
-versions. Version-format validation belongs to the Composer tool. `reference()` selects `dist.reference`, then
-`source.reference`, and otherwise returns null.
-Dedicated getters cover requirements, source/dist, authors, support, funding, extra, scripts, and lock fields such as
-`version_normalized`, `notification-url`, `installation-source`, and `transport-options`. Field names follow the
-[Composer package schema](https://getcomposer.org/schema.json) and
-[Composer's package dumper](https://github.com/composer/composer/blob/main/src/Composer/Package/Dumper/ArrayDumper.php).
+Known types use `PackageType`; custom types keep their exact strings and their own group keys. The custom type `root` remains distinct from synthetic `Root`; numeric type keys follow PHP's array-key conversion. Empty type selections return `[]`, and conflicting package names are rejected.
 
-`isDev()` reflects `packages-dev` membership and is always false for the root. `extensions(true)` returns unique sorted
-lowercase `ext-*` names from this package's `require` and `require-dev`; false selects only `require`. It does not compute
-transitive application requirements or include suggestions, PHP versions, `lib-*`, or Composer API requirements.
+Each `ComposerPackageInterface` exposes native package fields and preserves the original record, including custom fields, as recursively normalized arrays. Optional scalar values return null; collection accessors default to `[]`. Absent `source` and `dist` return null. License, binary, and comment strings become lists. `version()` preserves the declared string without trimming, normalization, inference, or format validation; an omitted root version returns null. JSON structure and field types are checked, including string versions and required lock-package versions; version formats are not. `reference()` selects `dist.reference`, then `source.reference`, and otherwise returns null. Dedicated getters cover requirements, source/dist, authors, support, funding, extra, scripts, and lock fields such as `version_normalized`, `notification-url`, `installation-source`, and `transport-options`. Field names follow the [Composer package schema](https://getcomposer.org/schema.json) and [Composer's package dumper](https://github.com/composer/composer/blob/main/src/Composer/Package/Dumper/ArrayDumper.php).
 
-`ComposerAutoloadInterface::classRules()` separates `psr-0`, `psr-4`, `classmap`, and `exclude-from-classmap` from
-`files()`. PSR path strings become lists; duplicates are removed while preserving declaration order and path spelling.
-`autoloadDev()` exposes a separate development declaration. These methods neither check path existence nor execute
-files. The existing runtime scan interfaces retain responsibility for filesystem containment and class discovery.
+`isDev()` reflects `packages-dev` membership and is always false for the root. `extensions(true)` returns unique sorted lowercase `ext-*` names from this package's `require` and `require-dev`; false selects only `require`. It does not compute transitive application requirements or include suggestions, PHP versions, `lib-*`, or Composer API requirements.
 
-## Package metadata API
+`ComposerAutoloadInterface::classRules()` separates `psr-0`, `psr-4`, `classmap`, and `exclude-from-classmap` from `files()`. PSR path strings become lists; duplicates are removed while preserving declaration order and path spelling. `autoloadDev()` exposes the separate development declaration. These methods neither check path existence nor execute files.
 
-Native metadata comes from the root manifest and lock file through `ComposerMetadata`:
+Manifest and lock structural errors raise `ComposerFileException`; scan-rule validation raises `AutoloadRuleException` or `LockFileException`.
+
+## Package manager
+
+Load the application's generated Composer entry, then resolve the shared package manager through the DI container:
 
 ```php
-use SuperKernel\Composer\Metadata\ComposerMetadata;
-use SuperKernel\Composer\Path\BasePath;
+require '/srv/application/vendor/autoload.php';
 
-$metadata = new ComposerMetadata(new BasePath('/srv/application'));
-$root = $metadata->root();
-$lockedPackages = $metadata->all(); // Excludes Root.
+$packages = $container->get(SuperKernel\Contract\PackageManagerInterface::class);
 ```
 
-Use `PackageManagerProvider` for the scanned shared package-manager interface. The runtime package manager preserves
-normalized dependencies, environment requirements, scan rules, and exact class ownership from those native fields.
-The single `SuperKernel\Composer\Manager\PackageManager` implementation uses the shared
-`SuperKernel\Contract\PackageManagerInterface`. Its constructor accepts a prepared package graph, class maps,
-and ordered autoload-file paths, without discovery, scanning, storage access, or loader registration.
-Shared `PackageMetadataInterface` and `PackageManagerInterface` ports belong to Contract; Composer's richer
-`PackageInterface` exposes scan rules. `ClassMapBuilder::build()` accepts a package list such as `$manager->all()`.
-
-Manifest/lock structural errors are `ComposerFileException`; scan-rule validation uses autoload/lock exceptions.
-The scanned root requires a package name. Root and dependencies share `Model\Package`: `type()` identifies Root,
-`composerType()` retains the declared Composer type, and `locatedPath()` provides its directory.
-`scanRules()` supplies production rules; `scanRulesFor(AutoloadScope::Development)` adds root development rules.
-When constructing Root, supply `PackageType::Root`, its path, and no lock-derived state. Optional `composerType`
-and `developmentScanRules` describe its declared type and merged discovery rules.
-
-Every `PackageInterface` publishes two independent requirement sets:
-
-- `dependencies()` and `hasDependencies()` contain only installable `vendor/package` requirements;
-- `environmentRequirements()` and `hasEnvironmentRequirements()` contain PHP, PHP subtypes, HHVM, `ext-*`, `lib-*`,
-  and Composer API requirements supplied by the runtime environment.
-
-It also publishes `reference()`, version, Composer type, lock development classification, located path, and validated
-scan rules. A root reference is `null`; a lock reference uses distribution first, then source, and remains `null` when
-neither exists. No version or installed metadata is used to fabricate one.
-
-Root `require` and `require-dev` are represented with their development flags. Lock packages contribute only runtime
-`require`; dependency-package `require-dev` is root-only Composer metadata and is not transitive.
-
-## Package class graphs
-
-Three public lookups expose derived class ownership:
-
-```php
-$composerClasses = $packages->classes('super-kernel/composer');
-$allClasses = $packages->allClasses();
-$owner = $packages->packageForClass(SuperKernel\Composer\Manager\PackageManager::class);
-```
-
-`classes()` returns one package's sorted class-to-absolute-path map, `[]` for a known package without classes, and `null`
-for an unknown package. `allClasses()` returns the aggregate loader map. `packageForClass()` returns the package selected
-for an exact symbol or `null`. Root declarations win aggregate collisions, followed by normalized package order; each
-per-package map still retains its own declaration.
-
-The root is scanned with `autoload` plus `autoload-dev`; lock packages use only `autoload`. Candidate files may have any
-suffix. Named classes, interfaces, traits, and enums are included. Anonymous classes and unparseable files are ignored.
-Explicit classmap rules outrank PSR directories, and `exclude-from-classmap` remains effective.
-
-## Metadata and location boundaries
-
-Root identity, requirements, and autoload declarations come only from the explicit root `composer.json`. Locked names,
-versions, references, types, runtime requirements, development classification, and autoload declarations come only from
-`composer.lock` `packages` and `packages-dev`, including the Composer component itself.
-
-`PackageManagerProvider` is the sole installation-state reader. It requires
-`VendorDirInterface $vendorDir` and reads that directory's `composer/installed.php` once per
-invocation. Only `root.dev` and membership in `versions` are used: in a `dev=false` installation, absent development
-lock entries are excluded before location, scanning, or cache restoration. Recorded development packages remain
-included. Development installations retain the complete lock graph. Production entries are never excluded.
-A missing directory for a required production or development package still raises `PackageLocationException`.
-Missing, unreadable, or malformed installation state raises `ComposerFileException` instead of guessing from paths.
-
-Composer's generated state determines installation membership, while
-manifest and lock remain the sole authority for package data. The provider uses the supplied vendor directory rather
-than global `InstalledVersions` state, so separate workspaces cannot accidentally share installation membership.
-`ComposerMetadata::all()`, `get()`, and `packages-dev` membership are unchanged and remain readable without vendor.
-Metadata readers and `PackageParser` never consult installation state, dependency manifests, plugins, scripts, or
-the network. `installed.json` and `Composer\InstalledVersions` are not read.
-
-DI injects the registered vendor directory. Direct provider callers supply the same installation state:
+Composer keeps its own loader and executes its declared file-autoload entries. `Provider\PackageManagerProvider` builds the manager from a `Contract\PackageReconcilerInterface`, a `ComposerMetadataInterface` snapshot, and the matching `VendorDirInterface`, all describing the same project. Direct callers obtain the reconciler from the container or supply their own implementation:
 
 ```php
 $packages = new PackageManagerProvider()($reconciler, $metadata, $vendorDir);
 ```
 
-For an already-prepared graph without installation-state discovery, construct `Manager\PackageManager` directly.
+Each invocation builds a fresh manager from the supplied snapshot without path detection or repeated manifest and lock reads; supply a new snapshot to observe changed lock entries. Building it changes neither SPL registration nor file-autoload execution. The DI container retains the shared instance, and previously returned managers keep their prepared graphs.
 
-Root `autoload` and `autoload-dev` are always scanned, including in production. Installed dependencies use only
-production `autoload`; selecting installation membership does not narrow these discovery rules. `PackageParser`
-continues to locate packages through its injected `PackageLocatorInterface`, canonicalize path-repository links,
-and leave metapackages unlocated.
+The provider reads the vendor directory's `composer/installed.php` once per invocation and uses only `root.dev` and membership in `versions`. In a `dev=false` installation, development lock entries that are not installed are excluded before location, scanning, or cache restoration; installed development packages stay included, and development installations keep the complete lock graph. Production entries are never excluded. A missing directory for a required production or development package raises `PackageLocationException`, and missing, unreadable, or malformed installation state raises `ComposerFileException`. `installed.json` and `Composer\InstalledVersions` are not read, so separate projects cannot share installation membership.
 
-`Metadata\PackageParser` implements the component-local `Contract\PackageParserInterface`, which exposes `locate()`,
-`parse()`, and `autoloadFiles()`. The class is marked with `Provider(PackageParserInterface::class)` and requires
-`BasePathInterface $basePath`, `VendorDirInterface $vendorDir`, and `PackageLocatorInterface $locator` in its constructor.
-Construction reads no metadata and locates no packages; direct callers must supply all three services and use `basePath` for the first named argument.
-`PackageReconciler` depends on this interface, allowing a custom parser to be injected through
-`PackageReconciler` with `parser: $parser`.
+Every `PackageInterface` publishes two independent requirement sets:
 
-`Locator\PackageLocator` is marked with `Provider(PackageLocatorInterface::class)` and supplies the standard
-`<vendor>/<package>` candidate. DI injects this implementation by default; direct callers can pass it or a custom
-locator for installer-specific layouts. The supplied locator is authoritative and may return an absolute or
-vendor-relative candidate. A null candidate, invalid path,
-missing directory, or file in place of a directory raises `PackageLocationException` without a standard-layout fallback.
-Root and metapackage records do not invoke the locator.
+- `dependencies()` and `hasDependencies()` contain only installable `vendor/package` requirements;
+- `environmentRequirements()` and `hasEnvironmentRequirements()` contain PHP, PHP subtypes, HHVM, `ext-*`, `lib-*`, and Composer API requirements supplied by the runtime environment.
 
-Scan rules admit existing package-contained PSR-4, PSR-0, and classmap directories, files, and supported Composer `*`
-globs. Absolute paths, null bytes, parent traversal, unsupported wildcard forms, and symlink escapes are rejected.
-`autoload.files` is validated and resolved separately from class scanning. The manager exposes existing package-contained
-files in dependency order for callers; it does not execute them or convert them into scan inclusions. Legacy
-`target-dir` and `include-path` are not supported.
+It also publishes `reference()`, version, Composer type, lock development classification, located path, and validated scan rules. `type()` identifies Root, `composerType()` keeps the declared Composer type, and `locatedPath()` provides the package directory. A root reference is `null`; a lock reference uses distribution first, then source, and remains `null` when neither exists. Root `require` and `require-dev` are represented with their development flags. Lock packages contribute only runtime `require`; a dependency's `require-dev` is not transitive. The scanned root requires a package name.
 
-## Development
+### Class graphs
 
-Use a PHP 8.4 Composer in this package's checkout:
-
-```bash
-composer install
-composer validate --strict
-composer test
-composer format:check
-composer format
+```php
+$composerClasses = $packages->classes('super-kernel/composer');
+$allClasses = $packages->allClasses();
+$owner = $packages->packageForClass(App\Service\Clock::class);
 ```
+
+`classes()` returns one package's sorted class-to-absolute-path map, `[]` for a known package without classes, and `null` for an unknown package. `allClasses()` returns the aggregate loader map. `packageForClass()` returns the package selected for an exact symbol or `null`. Root declarations win aggregate collisions, followed by normalized package order; each per-package map still keeps its own declaration.
+
+The root is always scanned with `autoload` plus `autoload-dev`, including in production; lock packages use only `autoload`. Candidate files may have any suffix. Named classes, interfaces, traits, and enums are included; anonymous classes and unparseable or unreadable files are ignored. Explicit classmap rules outrank PSR directories, and `exclude-from-classmap` stays effective. `ClassMap\ClassMapBuilder::build()` accepts a package list such as `$packages->all()` and uses the injected `ClassNameParserInterface`.
+
+Scan rules admit existing package-contained PSR-4, PSR-0, and classmap directories, files, and supported Composer `*` globs. Absolute paths, null bytes, parent traversal, unsupported wildcard forms, and symlink escapes are rejected. `autoload.files` is validated and resolved separately: the manager exposes existing package-contained files in dependency order without executing them or treating them as scan inclusions. Legacy `target-dir` and `include-path` are not supported.
+
+### Package location
+
+Packages are located through `Contract\PackageLocatorInterface`. The default `Locator\PackageLocator` returns the standard `<vendor>/<package>` candidate; a custom implementation can support installer-specific layouts. The locator is authoritative and may return an absolute or vendor-relative path. A null candidate, invalid path, missing directory, or file in place of a directory raises `PackageLocationException` without a standard-layout fallback, and stops runtime initialization. Root and metapackage records do not use the locator, and path-repository links are canonicalized. Location is checked before every cache access, including cache hits and restore-only execution; a restored record's directory must also still exist.
+
+## Package caches
+
+Each package has its own serialized file below the vendor directory, for example:
+
+```text
+<vendor>/.cache/classes/acme/dependency.ser
+```
+
+A record holds the package, its class map, ordered file autoloads, the vendor-directory binding, and a SHA-256 checksum. On each reconciliation, a dependency whose cached `reference()` equals the current lock reference, including when both are null, reuses its cache and derived data; missing, invalid, or different-reference records are parsed, scanned, and rewritten. The root is always rescanned. Dependency metadata or source edits under an unchanged reference therefore reuse the cache: refresh the reference or remove that package's cache file to force a rebuild. Only packages in the current metadata are included, even when older cache files remain.
+
+Restoration verifies the package identity, root or dependency role, project, record structure, object layout, and checksum. Missing, unreadable, incompatible, or corrupted data raises `PackageCacheException`. Rebuild package caches through a scanning processor after upgrading the component; normal scanning replaces incompatible records, while Phar and other restore-only deployments must receive rebuilt snapshots. With `NullScanProcessor`, which is supported only inside a Phar, existing package files are restored without scanning.
+
+The checksum detects inconsistent data and does not authenticate local filesystem writers. Each package file is published atomically through a temporary file in the same directory, and a later package failure preserves earlier successful writes; concurrent writers are not coordinated across packages. Other files in the cache directory are left untouched.
