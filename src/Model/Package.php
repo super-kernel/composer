@@ -161,6 +161,28 @@ readonly class Package implements PackageInterface
         return $this->locatedPath;
     }
 
+    /**
+     * Returns a copy located at the given path, validated like a newly constructed package.
+     *
+     * @throws InvalidArgumentException When a root package would lose its project path
+     */
+    public function withLocatedPath(?string $locatedPath): self
+    {
+        return new self(
+            $this->name,
+            $this->version,
+            $this->reference,
+            $this->type,
+            $this->lockedDevPackage,
+            $locatedPath,
+            $this->scanRules,
+            $this->dependencies,
+            $this->environmentRequirements,
+            $this->developmentScanRules,
+            $this->composerType,
+        );
+    }
+
     public function dependencies(): array
     {
         return $this->dependencies;

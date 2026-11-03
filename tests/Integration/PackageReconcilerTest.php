@@ -180,7 +180,7 @@ final class PackageReconcilerTest extends TestCase
     }
 
     /** @throws Throwable When fixture setup or the operation under test throws */
-    public function testRejectsAMissingCachedLocationAfterTheVendorEntryIsRetargeted(): void
+    public function testARetargetedVendorEntryInvalidatesItsCachedLocation(): void
     {
         $this->withTemporaryDirectory(function (
             string $root,
@@ -200,15 +200,15 @@ final class PackageReconcilerTest extends TestCase
             self::assertTrue(rename($oldSource, $newSource));
             self::assertTrue(unlink($entry));
             self::assertTrue(symlink($newSource, $entry));
-            $exception = $this->assertThrows(
-                PackageLocationException::class,
-                fn() => $reconciler->reconcile($metadata),
-                'acme/a',
-            );
+            $restoreOnly = $this->reconciler($root, processor: new RestoreOnlyScanProcessor());
+            $this->assertThrows(PackageCacheException::class, fn() => $restoreOnly->reconcile($metadata));
+            $restored = $reconciler->reconcile($metadata);
 
-            self::assertStringContainsString($oldSource, $exception->getMessage());
-            self::assertSame([], $parser->sources);
-
+            self::assertSame($newSource, $restored->locatedPath());
+            self::assertNotSame([], $parser->sources);
+            self::assertSame([
+                'Acme\\A\\Stable' => $newSource . '/src/A.source',
+            ], $reconciler->classes('acme/a'));
         });
     }
 
@@ -343,16 +343,24 @@ final class PackageReconcilerTest extends TestCase
             ];
             unset($legacy['checksum']);
             $legacy['checksum'] = hash('sha256', serialize($legacy));
+            $bound = [
+                'vendorDirectory' => $root . '/vendor',
+                ...$record,
+            ];
+            unset($bound['checksum']);
+            $bound['checksum'] = hash('sha256', serialize($bound));
 
             foreach ([
                 'corruption',
                 'checksum',
                 'legacy',
+                'vendor binding',
             ] as $failure) {
                 $this->writeFile($root . '/vendor/.cache/classes/acme/a.ser', match ($failure) {
-                    'corruption' => 'corrupted',
-                    'checksum'   => str_replace('a-reference', 'x-reference', $original),
-                    'legacy'     => serialize($legacy),
+                    'corruption'     => 'corrupted',
+                    'checksum'       => str_replace('a-reference', 'x-reference', $original),
+                    'legacy'         => serialize($legacy),
+                    'vendor binding' => serialize($bound),
                 });
                 $restoreOnly = $this->reconciler($root, processor: new RestoreOnlyScanProcessor());
                 $this->assertThrows(PackageCacheException::class, fn() => $restoreOnly->reconcile($metadata));
@@ -595,7 +603,7 @@ final class PackageReconcilerTest extends TestCase
     }
 
     /** @throws Throwable When fixture setup or the operation under test throws */
-    public function testCopiedCacheDoesNotReuseARecordFromAnotherVendorDirectory(): void
+    public function testRecordsStayValidAfterTheProjectMoves(): void
     {
         $this->withTemporaryDirectory(function (
             string $root,
@@ -603,19 +611,27 @@ final class PackageReconcilerTest extends TestCase
             $firstRoot = $root . '/first';
             $secondRoot = $root . '/second';
             $this->workspace($firstRoot);
-            $this->workspace($secondRoot);
 
             $metadata = $this->package('a', 'a-reference');
             $this->reconciler($firstRoot)->reconcile($metadata);
-            $original = file_get_contents($firstRoot . '/vendor/.cache/classes/acme/a.ser');
-            $this->writeFile($secondRoot . '/vendor/.cache/classes/acme/a.ser', $original);
+            $this->reconciler($firstRoot)->reconcile(new ComposerMetadata(new BasePath($firstRoot))->root());
+            self::assertTrue(rename($firstRoot, $secondRoot));
+            $dependencyRecord = file_get_contents($secondRoot . '/vendor/.cache/classes/acme/a.ser');
+            $rootRecord = file_get_contents($secondRoot . '/vendor/.cache/classes/acme/project.ser');
             $restoreOnly = $this->reconciler($secondRoot, processor: new RestoreOnlyScanProcessor());
-            $this->assertThrows(PackageCacheException::class, fn() => $restoreOnly->reconcile($metadata));
-            $restored = $this->reconciler($secondRoot)->reconcile($metadata);
+            $dependency = $restoreOnly->reconcile($metadata);
+            $project = $restoreOnly->reconcile(new ComposerMetadata(new BasePath($secondRoot))->root());
 
-            self::assertSame($secondRoot . '/vendor/acme/a', $restored->locatedPath());
-            self::assertNotSame($original, file_get_contents($secondRoot . '/vendor/.cache/classes/acme/a.ser'));
-
+            self::assertSame($secondRoot . '/vendor/acme/a', $dependency->locatedPath());
+            self::assertSame($secondRoot, $project->locatedPath());
+            self::assertSame([
+                'Acme\\A\\Stable' => $secondRoot . '/vendor/acme/a/src/A.source',
+            ], $restoreOnly->classes('acme/a'));
+            self::assertSame([
+                'Application\\Root' => $secondRoot . '/src/Root.source',
+            ], $restoreOnly->classes('acme/project'));
+            self::assertStringNotContainsString($firstRoot, (string) $dependencyRecord);
+            self::assertStringNotContainsString($firstRoot, (string) $rootRecord);
         });
     }
 

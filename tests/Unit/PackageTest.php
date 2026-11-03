@@ -89,6 +89,46 @@ final class PackageTest extends TestCase
         ];
     }
 
+    public function testRelocatedCopiesKeepEveryOtherValueAndRevalidateRootState(): void
+    {
+        $production = new ScanRuleSet([
+            new ScanRule('src', ScanRuleSource::Classmap, ScanRuleKind::Directory, null),
+        ]);
+        $development = ScanRuleSet::merge($production, new ScanRuleSet([
+            new ScanRule('tests', ScanRuleSource::Classmap, ScanRuleKind::Directory, null),
+        ]));
+        $package = new Package(
+            'acme/application',
+            '1.0.0',
+            null,
+            PackageType::Root,
+            false,
+            '/build/project',
+            $production,
+            developmentScanRules: $development,
+            composerType: 'custom-project',
+        );
+
+        $relocated = $package->withLocatedPath('phar:///opt/app.phar');
+
+        self::assertNotSame($package, $relocated);
+        self::assertSame('/build/project', $package->locatedPath());
+        self::assertSame('phar:///opt/app.phar', $relocated->locatedPath());
+        self::assertSame('acme/application', $relocated->name());
+        self::assertSame('1.0.0', $relocated->version());
+        self::assertSame(PackageType::Root, $relocated->type());
+        self::assertSame('custom-project', $relocated->composerType());
+        self::assertSame($production, $relocated->scanRulesFor(AutoloadScope::Production));
+        self::assertSame($development, $relocated->scanRulesFor(AutoloadScope::Development));
+
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains(
+            'The root package must have a project path and no lock-derived state.',
+        );
+
+        $package->withLocatedPath(null);
+    }
+
     #[DataProvider('invalidRootState')]
     public function testRejectsInvalidRootState(
         ?string $path,

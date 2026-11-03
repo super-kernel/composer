@@ -100,7 +100,7 @@ $packages = new PackageManagerProvider()($reconciler, $metadata, $vendorDir);
 - `dependencies()` 和 `hasDependencies()` 只包含可安装的 `vendor/package` 依赖；
 - `environmentRequirements()` 和 `hasEnvironmentRequirements()` 包含由运行环境提供的 PHP、PHP 子类型、HHVM、`ext-*`、`lib-*` 以及 Composer API 要求。
 
-它还发布 `reference()`、版本、Composer 类型、锁文件中的开发分类、定位到的路径以及校验过的扫描规则。`type()` 标识 Root，`composerType()` 保留声明的 Composer 类型，`locatedPath()` 提供包目录。根包的 reference 为 `null`；锁定包的 reference 优先使用 dist，其次是 source，两者都没有时为 `null`。根包的 `require` 和 `require-dev` 会带着各自的开发标志表示。锁定包只贡献运行时的 `require`；依赖包的 `require-dev` 不会传递。被扫描的根包必须有包名。
+它还发布 `reference()`、版本、Composer 类型、锁文件中的开发分类、定位到的路径以及校验过的扫描规则。`type()` 标识 Root，`composerType()` 保留声明的 Composer 类型，`locatedPath()` 提供包目录；`Model\Package` 实现的 `withLocatedPath()` 返回一个位于另一目录、经过同样校验的副本。根包的 reference 为 `null`；锁定包的 reference 优先使用 dist，其次是 source，两者都没有时为 `null`。根包的 `require` 和 `require-dev` 会带着各自的开发标志表示。锁定包只贡献运行时的 `require`；依赖包的 `require-dev` 不会传递。被扫描的根包必须有包名。
 
 ### 类图
 
@@ -128,8 +128,8 @@ $owner = $packages->packageForClass(App\Service\Clock::class);
 <vendor>/.cache/classes/acme/dependency.ser
 ```
 
-一条记录包含包本身、其类图、有序的文件自动加载列表、绑定的 vendor 目录以及 SHA-256 校验和。每次协调时，如果某个依赖包缓存的 `reference()` 与当前锁文件中的 reference 相同（两者都为 null 也算相同），就复用其缓存和派生数据；缺失、无效或 reference 不同的记录会被重新解析、扫描并重写。根包总是会被重新扫描。因此，在 reference 不变的情况下修改依赖包的元数据或源码，仍会复用缓存：请更新 reference，或删除该包的缓存文件来强制重建。只有当前元数据中的包会被包含，即使还有更早的缓存文件残留。
+一条记录包含包本身、其类图、有序的文件自动加载列表以及 SHA-256 校验和，并且可以重定位：包的位置相对其所在环境存储，根包存为 `.`，依赖包存为 vendor 目录下的路径；类图和文件自动加载的路径则相对包目录存储。因此移动项目，或把项目打包进 Phar，记录依然有效。位于 vendor 目录之外的依赖包，或位于包目录之外的文件，会保留绝对路径，相应的记录只在该路径下有效。每次协调时，如果某个依赖包缓存的 `reference()` 与当前锁文件中的 reference 相同（两者都为 null 也算相同），就复用其缓存和派生数据；缺失、无效或 reference 不同的记录会被重新解析、扫描并重写。根包总是会被重新扫描。因此，在 reference 不变的情况下修改依赖包的元数据或源码，仍会复用缓存：请更新 reference，或删除该包的缓存文件来强制重建。只有当前元数据中的包会被包含，即使还有更早的缓存文件残留。
 
-恢复时会校验包的身份、根包或依赖包的角色、所属项目、记录结构、对象布局和校验和。数据缺失、不可读、不兼容或损坏时抛出 `PackageCacheException`。升级本组件之后，请通过一个执行扫描的处理器重建包缓存；正常扫描会替换不兼容的记录，而 Phar 和其他仅恢复的部署必须拿到重建后的快照。使用只在 Phar 内受支持的 `NullScanProcessor` 时，会直接恢复已有的包文件而不进行扫描。
+恢复时会校验包的身份、根包或依赖包的角色、记录结构、对象布局和校验和，并检查存储的位置是否与包当前的位置一致，然后基于当前位置展开存储的路径。数据缺失、不可读、不兼容或损坏时抛出 `PackageCacheException`。升级本组件之后，请通过一个执行扫描的处理器重建包缓存；正常扫描会替换不兼容的记录，而 Phar 和其他仅恢复的部署必须拿到重建后的快照。使用只在 Phar 内受支持的 `NullScanProcessor` 时，会直接恢复已有的包文件而不进行扫描。
 
 校验和用于发现不一致的数据，并不能验证本地文件系统的写入方。每个包文件都通过同目录下的临时文件原子发布，之后某个包失败也不会影响之前已成功写入的文件；跨包的并发写入方之间没有协调。缓存目录中的其他文件保持不变。

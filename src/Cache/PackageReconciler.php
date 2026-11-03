@@ -14,14 +14,10 @@ use SuperKernel\Composer\Contract\PackageParserInterface;
 use SuperKernel\Composer\Contract\PackageReconcilerInterface;
 use SuperKernel\Composer\Exception\ManifestException;
 use SuperKernel\Composer\Exception\PackageCacheException;
-use SuperKernel\Composer\Exception\PackageLocationException;
 use SuperKernel\Composer\Metadata\ComposerPackageName;
 use SuperKernel\Contract\VendorDirInterface;
 use SuperKernel\ScanIsolation\Contract\ScanProcessorInterface;
 use SuperKernel\ScanIsolation\Exception\ScanProcessorUnavailableException;
-
-use function is_dir;
-use function sprintf;
 
 /**
  * Reconciles one package inside the scan processor and returns its subsequently restored cache instance.
@@ -68,7 +64,7 @@ final class PackageReconciler implements PackageReconcilerInterface
         $this->scanProcessor->execute(function () use ($metadata, $name, $path, $root, $locatedPath): void {
             if (!$root && $this->storage->isFile($path)) {
                 try {
-                    $cached = $this->storage->read($path, $name, $root);
+                    $cached = $this->storage->read($path, $name, $root, $locatedPath);
 
                     if ($cached['package']->reference() === $metadata->reference()) {
                         return;
@@ -87,26 +83,12 @@ final class PackageReconciler implements PackageReconcilerInterface
             );
         });
 
-        $restored = $this->storage->read($path, $name, $root);
-        $package = $restored['package'];
-        $restoredPath = $package->locatedPath();
-
-        if (
-            PackageType::Metapackage !== $package->type()
-            && $restoredPath !== $locatedPath
-            && (null === $restoredPath || !is_dir($restoredPath))
-        ) {
-            throw new PackageLocationException(sprintf(
-                'Package "%s" has no existing directory (cached location: %s).',
-                $name,
-                $restoredPath ?? 'none',
-            ));
-        }
+        $restored = $this->storage->read($path, $name, $root, $locatedPath);
 
         $this->classes[$name] = $restored['classes'];
         $this->autoloadFiles[$name] = $restored['autoloadFiles'];
 
-        return $package;
+        return $restored['package'];
     }
 
     public function classes(string $packageName): array
