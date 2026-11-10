@@ -4,6 +4,9 @@
 
 # SuperKernel Composer Metadata
 
+> [!WARNING]
+> This package is deprecated and no longer maintained. Since SuperKernel 1.0.0-alpha.2, SKERNEL reads the Composer files and generates an application's package metadata when it builds the project, and `super-kernel/metadata` restores that metadata at runtime, so applications no longer install this package.
+
 `super-kernel/composer` reads the root `composer.json` and `composer.lock` metadata and provides package graphs, class maps, and class ownership on demand. Applications load Composer's generated `vendor/autoload.php`; package discovery begins only when a caller requests `PackageManagerProvider` or its DI service. Loading the component does not scan packages, register an SPL loader, or execute package file-autoload declarations.
 
 ## Project root and vendor directory
