@@ -4,6 +4,9 @@
 
 # SuperKernel Composer Metadata
 
+> [!WARNING]
+> 此包已废弃，不再维护。自 SuperKernel 1.0.0-alpha.2 起，SKERNEL 在构建项目时读取 Composer 文件并生成应用的包元数据，`super-kernel/metadata` 在运行期还原这些元数据，应用不再安装此包。
+
 `super-kernel/composer` 读取根项目的 `composer.json` 和 `composer.lock` 元数据，并按需提供包依赖图、类图和类的归属。应用加载 Composer 生成的 `vendor/autoload.php`；只有当调用方请求 `PackageManagerProvider` 或其 DI 服务时，才会开始包的发现。加载本组件不会扫描包、不会注册 SPL 加载器，也不会执行包声明的文件自动加载。
 
 ## 项目根目录与 vendor 目录
